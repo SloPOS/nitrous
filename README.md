@@ -1,4 +1,4 @@
-# Nitrous
+# Nitrous (for Oxide)
 
 A small web-based plugin manager for [Oxide/uMod](https://umod.org) on a Rust dedicated server.
 It runs in a Docker container beside the game server, reads the server's `oxide` folder
