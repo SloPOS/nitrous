@@ -164,8 +164,19 @@ The **Activity** panel shows each step and the outcome.
 
 **Config** opens the plugin's `oxide/config/<Plugin>.json`.
 
-- **Form** shows every option as a field: checkboxes, numbers, text, collapsible groups, and
-  lists with add/remove.
+- **Form** shows every option as a field, grouped the way the file is, with add/remove for lists:
+  - **Plain-word names.** Code-style names are reworded for reading (`ShowCode` → *Show code*,
+    `SkinId` → *Skin ID*, `cacheMinutes` → *Cache minutes*). Hover a reworded name to see the
+    original. The file always keeps the plugin's own names. Names that are data, such as item
+    names, prefab paths and permissions, are shown exactly as written.
+  - **True/false options are dropdowns,** worded to fit the option: *Enabled / Disabled* for
+    options such as "Enable …" or "… Enabled", *Yes / No* for the rest.
+  - **Numbers stay numbers,** with one exception: an option named exactly *Enabled*, *Disabled*
+    or *Active* whose value is `0` or `1` is shown as a dropdown and still saved as `0` or `1`.
+  - **Documented special values become shortcuts.** When an option's name says something like
+    `(0 = disabled)` or `(-1 = All skins)`, that appears as a button under the field which sets
+    the value, and lights up when the value is in effect.
+  - **Find an option by name** filters a large config down to the matching options.
 - **Raw JSON** is the file as text, for anything the form cannot do, such as adding new keys.
 - **Save and reload plugin** validates the JSON, backs up the current file, writes the new
   one and reloads the plugin. The Activity panel reports whether it loaded.
@@ -216,6 +227,9 @@ Nitrous can replace code that runs inside your game server, so treat it like an 
   Nitrous only sees load and compile results.
 - **Config forms come from the JSON file,** not the plugin source, so there are no descriptions
   beyond the option names, and options a plugin has not written to its file do not appear.
+- **Numbers are not guessed to be switches.** A `0`, `1` or `-1` is only given a meaning when
+  the option's name states it. In real configs most such values are multipliers, counts,
+  coordinates or IDs, so turning them into on/off switches would corrupt them.
 - **No uninstall button** yet. Delete the `.cs` file to remove a plugin.
 - **Whole numbers lose their `.0`.** A value written as `1.0` is saved as `1` from the form
   view. Plugins read both the same way.

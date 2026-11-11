@@ -91,6 +91,21 @@ plugin.
 - The form is generated from the **JSON file the plugin wrote**, not from the plugin source.
   Plugin authors define options in too many different ways for source parsing to be reliable,
   while the generated file always lists every option with its current value.
+- **Friendly names are display-only.** A key is reworded only when it is a single code-style
+  identifier (camelCase, PascalCase, snake_case). Keys containing spaces already read as text.
+  Keys containing `/` or `.`, and single all-lowercase words, are treated as data (prefab
+  paths, permissions, item names) and shown verbatim, because rewording them would mislead.
+  The tree being edited always holds the original keys, so saving cannot rename anything.
+- **Booleans are dropdowns; numbers are not booleans.** A survey of 30 real configs found about
+  1,300 true/false values and about 1,400 numeric `0`/`1` values, and none of the numeric ones
+  were switches: they were multipliers (`Loot Multiplier: 1`), coordinates, counts, version
+  parts and IDs. So a number is never converted by value. It is shown as a switch only when its
+  name is exactly *Enabled*, *Disabled* or *Active*, and it is still written back as `0` or `1`
+  because that is the type the plugin reads.
+- **Special values come from the author.** Sentinels such as `-1` or `0` mean different things
+  in different plugins (unlimited, disabled, "all skins"). The only trustworthy source is the
+  option's own name, which often documents it in parentheses, e.g. `(0 = disabled)`. Those are
+  parsed into shortcut buttons; undocumented sentinels are left as plain numbers.
 - **Large integers.** Steam IDs and skin IDs have 17 or more digits, beyond what a JavaScript
   number can hold exactly. Before parsing, the page wraps any integer of 16 or more digits as
   `{"$bigint": "…"}`, edits it as text, and unwraps it when writing, so the digits are
