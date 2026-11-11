@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 import httpx
 
 BASE = "https://umod.org/plugins"
-USER_AGENT = "oxide-plugin-manager/0.1"
+USER_AGENT = "Nitrous/0.1 (Oxide plugin manager)"  # identifies the tool honestly to uMod
 MIN_INTERVAL = 2.4  # seconds between requests, ~25/minute
 KEEP = (
     "name", "title", "slug", "author", "description", "url", "download_url",
@@ -58,6 +58,11 @@ class UmodClient:
                 await asyncio.sleep(slot - now)
             resp = await client.get(url)
             if resp.status_code != 429:
+                # uMod reports the remaining allowance in its headers. If it is nearly used
+                # up, back off before the next request rather than running into the limit.
+                remaining = resp.headers.get("X-RateLimit-Remaining", "")
+                if remaining.isdigit() and int(remaining) <= 2:
+                    self._next_slot = max(self._next_slot, time.monotonic() + 30)
                 return resp
             retry = resp.headers.get("Retry-After") or resp.headers.get("X-Retry-After") or "30"
             pause = min(float(retry) if retry.isdigit() else 30.0, 90.0) + 1

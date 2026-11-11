@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - run: python -m pytest -q
+        env:
+          VERIFY_TIMEOUT: "8"
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t nitrous:ci .
+      - name: Container starts and reports healthy
+        run: |
+          mkdir -p /tmp/oxide/plugins /tmp/data
+          docker run -d --name nitrous -p 8080:8080 -v /tmp/oxide:/oxide -v /tmp/data:/data nitrous:ci
+          for i in $(seq 1 20); do
+            curl -fs http://127.0.0.1:8080/healthz && exit 0
+            sleep 1
+          done
+          docker logs nitrous
+          exit 1

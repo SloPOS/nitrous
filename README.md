@@ -24,6 +24,7 @@ Nitrous is not affiliated with uMod, Oxide or Facepunch.
 - [Using Nitrous](#using-nitrous)
 - [Backups](#backups)
 - [Security](#security)
+- [Use of uMod](#use-of-umod)
 - [Limitations](#limitations)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
@@ -79,7 +80,8 @@ RUST_CONTAINER=my-rust-server RUST_OXIDE=/mnt/user/appdata/rust/oxide bash deplo
 
 The script builds the image, generates a page password on first run, reads the RCON address,
 port and password from the Rust container's environment (`RCON_PORT`, `RCON_PASSWORD`), and
-starts Nitrous. Run it again to upgrade, or after changing the RCON password.
+starts Nitrous. Run it again to upgrade, or after changing the RCON password. Set `IMAGE` to
+run a published image instead of building one.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -92,7 +94,8 @@ starts Nitrous. Run it again to upgrade, or after changing the RCON password.
 | `RCON_HOST`, `RCON_PORT`, `RCON_PASSWORD` | read from the Rust container | Override if your image uses other variable names |
 
 When it finishes, open `http://<docker-host>:8790`. The browser asks for a password: use any
-username and the contents of `$BASE/password.txt`.
+username and the password in `$BASE/data/config.json`. See
+[Password and lockout](#password-and-lockout) to change it.
 
 ### Option 2: plain Docker
 
@@ -102,25 +105,73 @@ docker build -t nitrous .
 
 ```bash
 docker run -d --name nitrous --restart unless-stopped -p 8790:8080 \
-  -e MANAGER_PASSWORD='choose-a-long-password' \
   -e RCON_HOST=192.0.2.10 -e RCON_PORT=28016 -e RCON_PASSWORD='your-rcon-password' \
   -v /path/to/rust/oxide:/oxide \
   -v /path/to/nitrous-data:/data \
   nitrous
 ```
 
+Then set a password by creating `config.json` in the data folder (see
+[Password and lockout](#password-and-lockout)). Until a password is set, Nitrous is read-only.
+
 ### Read-only mode
 
-To only look, mount the Oxide folder read-only (`-v /path/to/rust/oxide:/oxide:ro`) or leave
-`MANAGER_PASSWORD` unset. Either one disables every button that changes something.
+To only look, mount the Oxide folder read-only (`-v /path/to/rust/oxide:/oxide:ro`) or set no
+password. Either one disables every button that changes something.
+
+### Publishing an image
+
+To build a versioned image and push it to a registry such as Docker Hub:
+
+```bash
+docker build -t YOUR_NAME/nitrous:0.1.0 -t YOUR_NAME/nitrous:latest .
+```
+
+```bash
+docker login
+```
+
+```bash
+docker push --all-tags YOUR_NAME/nitrous
+```
 
 ## Configuration
 
-All settings are environment variables on the container.
+### Password and lockout
+
+The page password and the lockout rules live in `config.json` in Nitrous's data folder
+(`$BASE/data/config.json` with the deploy script, `/data/config.json` inside the container):
+
+```json
+{
+  "password": "choose-a-long-password",
+  "max_attempts": 5,
+  "lockout_minutes": 15
+}
+```
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `password` | *(none)* | Password for the page (any username). **No password = no login and read-only.** |
+| `max_attempts` | `5` | Wrong passwords allowed from one device before it is locked out |
+| `lockout_minutes` | `15` | How long a lockout lasts. `0` = until you unlock it on the server |
+
+The file is re-read whenever it changes, so edits take effect immediately without a restart.
+
+**Locked out?** While a device is locked, even the correct password is refused. On the server,
+either of these unlocks every device at once:
+
+- change `password` in `config.json` (also the way to reset a forgotten password), or
+- delete `lockouts.json` in the same folder.
+
+Wrong attempts are counted per device (by IP address), and the count resets after a successful
+sign-in. Lockouts survive a restart of the container.
+
+### Environment variables
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `MANAGER_PASSWORD` | *(empty)* | Password for the page (HTTP Basic, any username). **Unset = no login and read-only.** |
+| `MANAGER_PASSWORD` | *(empty)* | Fallback page password, used only when `config.json` sets none |
 | `OXIDE_DIR` | `/oxide` | Where the server's `oxide` folder is mounted |
 | `DATA_DIR` | `/data` | Cache and backups |
 | `CHECK_INTERVAL_HOURS` | `6` | How often to re-check uMod in the background |
@@ -208,7 +259,9 @@ They are plain copies. To restore one by hand, copy it back over the original fi
 Nitrous can replace code that runs inside your game server, so treat it like an admin tool.
 
 - **Keep it off the internet.** Do not port-forward it. Reach it over your LAN or a VPN.
-- **Set `MANAGER_PASSWORD`.** Without it there is no login, and all changes are disabled.
+- **Set a password** in `config.json`. Without one there is no login, and all changes are disabled.
+- **Five wrong passwords lock a device out** for 15 minutes by default, which makes guessing
+  impractical. See [Password and lockout](#password-and-lockout).
 - **The login is HTTP Basic over plain HTTP.** That is acceptable on a trusted LAN or VPN.
   Put it behind an HTTPS reverse proxy if anyone else shares the network.
 - **Changes need a custom header** (`X-Nitrous: 1`), so another website cannot trigger them
@@ -216,6 +269,25 @@ Nitrous can replace code that runs inside your game server, so treat it like an 
 - **Plugins are code.** Nitrous only downloads from uMod and checks that a download looks like
   an Oxide plugin; it does not review what the plugin does. Install plugins you trust.
 - The RCON password is only used inside the container and is never logged or returned by the API.
+
+## Use of uMod
+
+Nitrous reads plugin information and downloads plugin files from uMod on your behalf, the same
+files you would download in a browser. It is built to be a considerate client:
+
+- It uses the JSON endpoints uMod staff have described publicly on the uMod forums
+  (per-plugin JSON and the plugin search), and nothing behind the site's browser checks.
+- It stays under uMod's limit of 30 requests a minute by spacing requests about 2.4 seconds
+  apart, backs off when uMod's rate-limit headers show the allowance is nearly used, and
+  waits as instructed on a `429` response.
+- It caches results (lookups for 6 hours, searches for 10 minutes) and identifies itself with
+  its own `User-Agent`.
+- It never redistributes plugins. Each file goes straight from uMod to your server, and each
+  plugin remains under its author's license.
+
+uMod staff have said the search endpoint is a legacy one that may eventually be replaced, so
+search may need updating if uMod changes its site. Nitrous is an independent project: if you
+publish or operate it at scale, read uMod's current terms yourself.
 
 ## Limitations
 
@@ -239,7 +311,8 @@ Nitrous can replace code that runs inside your game server, so treat it like an 
 
 | Symptom | Likely cause |
 |---|---|
-| Banner: *Read-only: updates are disabled…* | `MANAGER_PASSWORD` is unset, or `/oxide` is mounted read-only |
+| Banner: *Read-only: updates are disabled…* | No password is set, or `/oxide` is mounted read-only |
+| *Too many wrong passwords* | That device is locked out. Wait, or unlock it on the server: see [Password and lockout](#password-and-lockout) |
 | Banner: *The Oxide plugins folder was not found* | The `/oxide` mount does not point at the folder containing `plugins/` |
 | Every plugin shows *Unloaded* | The server shut down or is restarting; Oxide logs an unload for each plugin on exit |
 | Every plugin shows *Unknown* | Oxide has not written a log in the last two log files, or logs are elsewhere |
@@ -281,6 +354,7 @@ OXIDE_DIR=/path/to/oxide-copy DATA_DIR=/tmp/nitrous-data MANAGER_PASSWORD=dev \
 | Path | Purpose |
 |---|---|
 | `app/main.py` | FastAPI app: routes, login guard, background check, job runner |
+| `app/auth.py` | Page password, `config.json`, and the lockout after wrong attempts |
 | `app/scanner.py` | Reads installed plugins: version, author, hash |
 | `app/umod.py` | uMod client: lookup, search, cache, rate limiting |
 | `app/oxidelog.py` | Parses Oxide's log into loaded / failed / unloaded events |
