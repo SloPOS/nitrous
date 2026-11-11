@@ -15,6 +15,15 @@ directly, and uses [uMod](https://umod.org/plugins?categories=rust) as its sourc
 
 Nitrous is not affiliated with uMod, Oxide or Facepunch.
 
+![The plugin list: installed version, latest version on uMod, and whether the server loaded each plugin](docs/images/plugin-list.jpg)
+
+| | |
+|---|---|
+| ![Plugins that fail to compile, shown with the server's compiler error](docs/images/fails-to-compile.jpg) | ![The config editor: plain-word option names, dropdowns for true/false, and option search](docs/images/config-editor.jpg) |
+| Plugins broken by a game update, with the compiler's error | Config editor with option search |
+| ![Searching uMod and installing a plugin](docs/images/add-plugins.jpg) | |
+| Search uMod and install with one press | |
+
 ## Contents
 
 - [How it works](#how-it-works)
@@ -80,8 +89,7 @@ RUST_CONTAINER=my-rust-server RUST_OXIDE=/mnt/user/appdata/rust/oxide bash deplo
 
 The script builds the image, generates a page password on first run, reads the RCON address,
 port and password from the Rust container's environment (`RCON_PORT`, `RCON_PASSWORD`), and
-starts Nitrous. Run it again to upgrade, or after changing the RCON password. Set `IMAGE` to
-run a published image instead of building one.
+starts Nitrous. Run it again to upgrade, or after changing the RCON password.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -97,18 +105,24 @@ When it finishes, open `http://<docker-host>:8790`. The browser asks for a passw
 username and the password in `$BASE/data/config.json`. See
 [Password and lockout](#password-and-lockout) to change it.
 
-### Option 2: plain Docker
+To use the published image instead of building one, add `IMAGE`:
 
 ```bash
-docker build -t nitrous .
+IMAGE=fauxrhino/nitrous:latest RUST_CONTAINER=my-rust-server RUST_OXIDE=/mnt/user/appdata/rust/oxide bash deploy.sh
 ```
+
+### Option 2: plain Docker
+
+The image is published on Docker Hub as
+[`fauxrhino/nitrous`](https://hub.docker.com/r/fauxrhino/nitrous). To build it yourself
+instead, run `docker build -t nitrous .` and use `nitrous` as the image name below.
 
 ```bash
 docker run -d --name nitrous --restart unless-stopped -p 8790:8080 \
   -e RCON_HOST=192.0.2.10 -e RCON_PORT=28016 -e RCON_PASSWORD='your-rcon-password' \
   -v /path/to/rust/oxide:/oxide \
   -v /path/to/nitrous-data:/data \
-  nitrous
+  fauxrhino/nitrous:latest
 ```
 
 Then set a password by creating `config.json` in the data folder (see
