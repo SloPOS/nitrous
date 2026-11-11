@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nitrous</title>
+<style>
+  :root {
+    --bg: #f4f2ee; --panel: #ffffff; --ink: #1d1b18; --muted: #6b665e; --line: #e2ded6;
+    --accent: #c1440e; --ok: #2e7d4f; --warn: #b26a00; --bad: #b3261e; --info: #3a5f8a; --idle: #7a756c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17150f; --panel: #211e17; --ink: #ece7dc; --muted: #a39c8e; --line: #353026;
+      --accent: #e8703a; --ok: #6cc38e; --warn: #e3a94a; --bad: #f0857c; --info: #8fb4dd; --idle: #a39c8e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 20px 24px 12px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .01em; }
+  h1 span { color: var(--accent); }
+  h1 small { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 8px; }
+  .spacer { flex: 1; }
+  #meta { color: var(--muted); font-size: 13px; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .primary { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; }
+  .ghost { background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; }
+  .small { padding: 4px 10px; font-size: 13px; border-radius: 5px; white-space: nowrap; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 4px 24px 14px; }
+  #search { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; min-width: 220px; }
+  .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; font-size: 13px; }
+  .chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+  .chip b { font-weight: 600; margin-left: 4px; }
+  main { padding: 0 24px 40px; }
+  .wrap { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 860px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  .name { font-weight: 600; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .err { color: var(--bad); font-size: 13px; max-width: 46ch; overflow-wrap: anywhere; }
+  .ver { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .status { font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .status::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; background: currentColor; }
+  .s-up_to_date, .s-loaded { color: var(--ok); } .s-update_available { color: var(--warn); }
+  .s-modified, .s-newer_local { color: var(--info); } .s-error, .s-failed { color: var(--bad); }
+  .s-not_on_umod, .s-unchecked, .s-unknown, .s-unloaded { color: var(--idle); }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  #notice { margin: 0 24px 14px; padding: 10px 14px; border: 1px solid var(--bad); color: var(--bad); border-radius: 8px; display: none; }
+  #activity { margin: 0 24px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: none; }
+  #activity h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+  #running { font-weight: 600; margin-bottom: 8px; }
+  #results { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; font-size: 14px; }
+  #results li { padding: 4px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+  #results .ok { color: var(--ok); font-weight: 600; } #results .no { color: var(--bad); font-weight: 600; }
+  .empty { padding: 28px; text-align: center; color: var(--muted); }
+  dialog { width: min(900px, 96vw); height: min(86vh, 900px); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); }
+  dialog[open] { display: flex; flex-direction: column; }
+  dialog::backdrop { background: rgba(0, 0, 0, .55); }
+  .ed-head, .ed-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; flex-wrap: wrap; }
+  .ed-head { border-bottom: 1px solid var(--line); } .ed-foot { border-top: 1px solid var(--line); }
+  .ed-head h2 { font-size: 16px; margin: 0; }
+  .tab { background: transparent; border: 1px solid var(--line); padding: 5px 12px; font-size: 13px; }
+  .tab:first-of-type { border-radius: 6px 0 0 6px; } .tab:last-of-type { border-radius: 0 6px 6px 0; margin-left: -9px; }
+  .tab[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .ed-body { flex: 1; overflow: auto; padding: 14px 16px; }
+  #edRaw { width: 100%; height: 100%; min-height: 300px; resize: none; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: 13px/1.5 ui-monospace, Consolas, monospace; tab-size: 2; }
+  #edMsg { color: var(--bad); font-size: 13px; flex: 1; min-width: 160px; }
+  .field { display: grid; grid-template-columns: minmax(140px, 38%) 1fr auto; gap: 10px; align-items: center; padding: 5px 0; }
+  .field > label { font-size: 14px; overflow-wrap: anywhere; }
+  .field input[type="text"], .field input[type="number"], .field textarea, #edRestore {
+    width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: inherit; }
+  .field textarea { min-height: 64px; resize: vertical; }
+  .field input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); justify-self: start; }
+  details.group { border-left: 2px solid var(--line); margin: 6px 0 6px 4px; padding-left: 12px; }
+  details.group > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+  details.group > summary small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .item-head { display: flex; align-items: center; gap: 8px; }
+  .item-head > details { flex: 1; }
+  .x { background: transparent; border: 1px solid var(--line); border-radius: 5px; padding: 2px 8px; font-size: 13px; color: var(--muted); }
+  .hint { color: var(--muted); font-size: 13px; }
+  #edRestore { width: auto; max-width: 220px; }
+  .result { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: start; }
+  .result:last-child { border-bottom: 0; }
+  .result .stale { color: var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>Nitrous</span><small>Oxide plugin manager</small></h1>
+  <div class="spacer"></div>
+  <div id="meta"></div>
+  <button class="ghost" id="addOpen">Add plugins</button>
+  <button class="ghost" id="refresh">Check for updates</button>
+  <button class="primary" id="updateAll">Update all</button>
+</header>
+<div id="notice"></div>
+<section id="activity" aria-live="polite">
+  <h2>Activity</h2>
+  <div id="running"></div>
+  <ul id="results"></ul>
+</section>
+<div class="bar">
+  <input id="search" type="search" placeholder="Filter plugins" aria-label="Filter plugins">
+  <div id="chips" class="bar" style="padding:0"></div>
+</div>
+<main>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Plugin</th><th>Installed</th><th>Latest</th><th>uMod</th><th>On server</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+<dialog id="finder" aria-labelledby="fdTitle">
+  <div class="ed-head">
+    <h2 id="fdTitle">Add plugins from uMod</h2>
+    <div class="spacer"></div>
+    <button class="ghost small" id="fdClose">Close</button>
+  </div>
+  <div class="ed-head">
+    <input id="fdQuery" type="search" placeholder="Search uMod (leave empty for most downloaded)" aria-label="Search uMod" style="flex:1;min-width:200px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 10px">
+    <select id="fdSort" aria-label="Sort by" style="background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:7px 8px">
+      <option value="downloads">Most downloaded</option>
+      <option value="latest_release_at">Recently updated</option>
+      <option value="title">Name</option>
+    </select>
+    <button class="primary small" id="fdGo" style="padding:8px 14px">Search</button>
+  </div>
+  <div class="ed-body" id="fdResults"></div>
+  <div class="ed-foot">
+    <div id="fdInfo" class="hint" style="flex:1"></div>
+    <button class="ghost small" id="fdPrev">Previous</button>
+    <button class="ghost small" id="fdNext">Next</button>
+  </div>
+</dialog>
+<dialog id="editor" aria-labelledby="edTitle">
+  <div class="ed-head">
+    <h2 id="edTitle">Config</h2>
+    <div class="spacer"></div>
+    <button class="tab" id="tabForm" aria-pressed="true">Form</button>
+    <button class="tab" id="tabRaw" aria-pressed="false">Raw JSON</button>
+  </div>
+  <div class="ed-body">
+    <div id="edForm"></div>
+    <textarea id="edRaw" spellcheck="false" aria-label="Raw JSON" hidden></textarea>
+  </div>
+  <div class="ed-foot">
+    <select id="edRestore" aria-label="Earlier versions"></select>
+    <button class="ghost small" id="edRestoreBtn">Restore</button>
+    <div id="edMsg" role="alert"></div>
+    <button class="ghost" id="edCancel">Cancel</button>
+    <button class="primary" id="edSave">Save and reload plugin</button>
+  </div>
+</dialog>
+<script>
+const LABELS = {
+  update_available: "Update available", up_to_date: "Up to date", modified: "Differs from uMod",
+  newer_local: "Newer than uMod", not_on_umod: "Not on uMod", error: "Check failed", unchecked: "Not checked yet",
+};
+const SERVER = { loaded: "Loaded", failed: "Fails to compile", unloaded: "Unloaded", unknown: "Unknown" };
+const ORDER = Object.keys(LABELS);
+const HINTS = {
+  modified: "Same version number as uMod, but the file contents differ (edited locally or from another source).",
+  newer_local: "The installed version is higher than uMod's latest, so it likely came from another source.",
+  not_on_umod: "uMod has no plugin with this file name. It may come from Codefling or another site.",
+  unknown: "Oxide's recent log has no load or compile entry for this plugin.",
+};
+let state = { plugins: [], summary: {}, progress: {}, job: { results: [] } }, filter = null, timer = null;
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+async function call(method, path, body) {
+  const opts = { method, headers: { "X-Nitrous": "1" } };
+  if (body !== undefined) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+  const r = await fetch(path, opts);
+  let data = null; try { data = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error((data && data.detail) || r.statusText || "Request failed");
+  return data;
+}
+async function post(path) {
+  try { await call("POST", path); } catch (e) { alert(e.message); }
+  load();
+}
+
+/* ---- config editor ---------------------------------------------------- */
+// JavaScript numbers lose precision past 16 digits (Steam IDs, skin IDs), so such
+// integers travel through the form as {"$bigint": "digits"} and are written back verbatim.
+function protectBigInts(text) {
+  let out = "", i = 0; const n = text.length;
+  while (i < n) {
+    const c = text[i];
+    if (c === '"') { let j = i + 1; while (j < n && text[j] !== '"') { if (text[j] === "\\") j++; j++; } out += text.slice(i, j + 1); i = j + 1; continue; }
+    if (c === "-" || (c >= "0" && c <= "9")) {
+      let j = i + 1; while (j < n && /[0-9.eE+\-]/.test(text[j])) j++;
+      const tok = text.slice(i, j);
+      out += /^-?\d{16,}$/.test(tok) ? `{"$bigint":"${tok}"}` : tok; i = j; continue;
+    }
+    out += c; i++;
+  }
+  return out;
+}
+const isBig = (v) => v && typeof v === "object" && !Array.isArray(v) && typeof v.$bigint === "string" && Object.keys(v).length === 1;
+const parseConfig = (text) => JSON.parse(protectBigInts(text));
+const stringifyConfig = (tree) => JSON.stringify(tree, null, 2).replace(/\{\s*"\$bigint":\s*"(-?\d+)"\s*\}/g, "$1");
+function blank(v) {
+  if (isBig(v)) return { $bigint: "0" };
+  if (Array.isArray(v)) return [];
+  if (v && typeof v === "object") return Object.fromEntries(Object.keys(v).map(k => [k, blank(v[k])]));
+  return typeof v === "number" ? 0 : typeof v === "boolean" ? false : typeof v === "string" ? "" : null;
+}
+
+/* ---- add plugins from uMod -------------------------------------------- */
+let finder = { page: 1, pages: 1 };
+async function searchUmod(page) {
+  const host = $("fdResults"), q = $("fdQuery").value.trim();
+  host.replaceChildren(el("div", "empty", "Searching uMod…")); $("fdInfo").textContent = "";
+  let data;
+  try { data = await call("GET", `api/umod/search?q=${encodeURIComponent(q)}&page=${page}&sort=${$("fdSort").value}`); }
+  catch (e) { host.replaceChildren(el("div", "empty", e.message)); return; }
+  finder = { page: data.page, pages: data.pages };
+  host.replaceChildren();
+  const busy = !!(state.job && state.job.running);
+  const cutoff = Date.now() - 2 * 365 * 864e5;
+  for (const r of data.results) {
+    const row = el("div", "result"), left = el("div"), right = el("div");
+    const a = el("a", "name", r.title || r.name); a.href = r.url; a.target = "_blank"; a.rel = "noopener";
+    left.append(a, el("div", "sub", `${r.name}.cs · ${r.author || "unknown"} · v${r.latest_release_version || "?"}`));
+    if (r.description) left.append(el("div", "sub", r.description));
+    const released = (r.latest_release_at || "").slice(0, 10);
+    const old = released && new Date(released).getTime() < cutoff;
+    const meta = el("div", "sub" + (old ? " stale" : ""), `${Number(r.downloads || 0).toLocaleString()} downloads · released ${released || "unknown"}` + (old ? " · not updated in over 2 years, may not work on the current game" : ""));
+    left.append(meta);
+    const status = r.status_detail && r.status_detail.text;
+    if (status && status !== "Published") left.append(el("div", "sub stale", "uMod status: " + status));
+    if (r.installed) right.append(el("span", "status s-up_to_date", "Installed"));
+    else if (state.can_change) {
+      const b = el("button", "primary small", "Install"); b.disabled = busy;
+      b.onclick = async () => {
+        if (!confirm(`Install ${r.name}.cs v${r.latest_release_version} on the server?`)) return;
+        try { await call("POST", `api/umod/install/${r.name}`); $("finder").close(); load(); } catch (e) { alert(e.message); }
+      };
+      right.append(b);
+    }
+    row.append(left, right); host.append(row);
+  }
+  if (!data.results.length) host.append(el("div", "empty", "No plugins found."));
+  $("fdInfo").textContent = `${data.total.toLocaleString()} plugins · page ${data.page} of ${data.pages}`;
+  $("fdPrev").disabled = data.page <= 1; $("fdNext").disabled = data.page >= data.pages;
+  host.scrollTop = 0;
+}
+
+let ed = null, fieldId = 0;
+const touch = () => { if (ed) ed.dirty = true; };
+
+function renderNode(parent, key, label, depth) {
+  const v = parent[key];
+  if (Array.isArray(v) || (v && typeof v === "object" && !isBig(v))) {
+    const isArr = Array.isArray(v);
+    const d = el("details", "group"); d.open = depth < 1 || Object.keys(v).length <= 12 && depth < 3;
+    const sum = el("summary", null, label); const count = el("small"); sum.append(count); d.append(sum);
+    const body = el("div"); d.append(body);
+    const draw = () => {
+      body.replaceChildren();
+      const keys = Object.keys(v);
+      count.textContent = isArr ? `${keys.length} item${keys.length === 1 ? "" : "s"}` : "";
+      keys.forEach((k) => {
+        const child = renderNode(v, isArr ? Number(k) : k, isArr ? `Item ${Number(k) + 1}` : k, depth + 1);
+        if (!isArr) { body.append(child); return; }
+        const rm = el("button", "x", "Remove"); rm.type = "button";
+        rm.onclick = () => { v.splice(Number(k), 1); touch(); draw(); };
+        if (child.classList.contains("field")) { child.append(rm); body.append(child); }
+        else { const row = el("div", "item-head"); row.append(child, rm); row.style.alignItems = "flex-start"; body.append(row); }
+      });
+      if (isArr) {
+        const add = el("button", "ghost small", "Add item"); add.type = "button";
+        add.onclick = () => { v.push(v.length ? blank(v[v.length - 1]) : ""); touch(); draw(); };
+        body.append(add);
+      } else if (!keys.length) body.append(el("div", "hint", "Empty. Use the Raw JSON view to add entries."));
+    };
+    draw();
+    return d;
+  }
+  const row = el("div", "field"); const id = "f" + (++fieldId);
+  const lab = el("label", null, label); lab.htmlFor = id; row.append(lab);
+  let input;
+  if (isBig(v)) {
+    input = el("input"); input.type = "text"; input.inputMode = "numeric"; input.value = v.$bigint;
+    input.oninput = () => { if (/^-?\d+$/.test(input.value)) { parent[key] = { $bigint: input.value }; touch(); } };
+  } else if (typeof v === "boolean") {
+    input = el("input"); input.type = "checkbox"; input.checked = v;
+    input.onchange = () => { parent[key] = input.checked; touch(); };
+  } else if (typeof v === "number") {
+    input = el("input"); input.type = "number"; input.step = "any"; input.value = String(v);
+    input.oninput = () => { if (input.value !== "" && !Number.isNaN(Number(input.value))) { parent[key] = Number(input.value); touch(); } };
+  } else if (typeof v === "string") {
+    input = el(v.length > 70 || v.includes("\n") ? "textarea" : "input"); if (input.tagName === "INPUT") input.type = "text";
+    input.value = v; input.oninput = () => { parent[key] = input.value; touch(); };
+  } else {
+    input = el("input"); input.type = "text"; input.value = ""; input.placeholder = "null (type to set a text value)";
+    input.oninput = () => { parent[key] = input.value === "" ? null : input.value; touch(); };
+  }
+  input.id = id; row.append(input);
+  return row;
+}
+
+function drawForm() {
+  const host = $("edForm"); host.replaceChildren(); fieldId = 0;
+  const holder = { root: ed.tree };
+  const node = renderNode(holder, "root", ed.name + ".json", 0);
+  node.open = true; host.append(node);
+}
+function setMode(mode) {
+  $("edMsg").textContent = "";
+  if (mode === "raw" && ed.mode === "form") $("edRaw").value = stringifyConfig(ed.tree);
+  if (mode === "form" && ed.mode === "raw") {
+    try { ed.tree = parseConfig($("edRaw").value); } catch (e) { $("edMsg").textContent = "Fix the JSON before switching to the form: " + e.message; return; }
+    drawForm();
+  }
+  ed.mode = mode;
+  $("edForm").hidden = mode !== "form"; $("edRaw").hidden = mode !== "raw";
+  $("tabForm").setAttribute("aria-pressed", String(mode === "form")); $("tabRaw").setAttribute("aria-pressed", String(mode === "raw"));
+}
+async function openEditor(p) {
+  let cfg;
+  try { cfg = await call("GET", `api/plugins/${p.name}/config`); } catch (e) { alert(e.message); return; }
+  if (!cfg.exists) { alert("This plugin has no config file yet."); return; }
+  ed = { name: p.name, sha1: cfg.sha1, tree: null, mode: "form", dirty: false };
+  $("edTitle").textContent = `${p.title || p.name} config`;
+  $("edRaw").value = cfg.text; $("edMsg").textContent = "";
+  const sel = $("edRestore"); sel.replaceChildren();
+  sel.append(new Option(cfg.backups.length ? `Earlier versions (${cfg.backups.length})` : "No earlier versions", ""));
+  cfg.backups.forEach(b => sel.append(new Option(b.taken.replace(/^(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d).*/, "$1-$2-$3 $4:$5:$6"), b.file)));
+  sel.disabled = $("edRestoreBtn").disabled = !cfg.backups.length || !state.can_change;
+  $("edSave").disabled = !state.can_change;
+  try { ed.tree = parseConfig(cfg.text); drawForm(); setMode("form"); }
+  catch (e) { ed.mode = "form"; ed.tree = {}; setMode("raw"); ed.mode = "raw"; $("edRaw").value = cfg.text; $("edMsg").textContent = "This file is not valid JSON, so only the raw view is available: " + e.message; }
+  $("editor").showModal();
+}
+function closeEditor(force) {
+  if (!force && ed && ed.dirty && !confirm("Discard your unsaved changes?")) return;
+  ed = null; $("editor").close();
+}
+async function saveEditor() {
+  let text;
+  try { text = ed.mode === "raw" ? $("edRaw").value : stringifyConfig(ed.tree); parseConfig(text); }
+  catch (e) { $("edMsg").textContent = "Not valid JSON: " + e.message; return; }
+  $("edSave").disabled = true;
+  try {
+    const r = await call("PUT", `api/plugins/${ed.name}/config`, { text, sha1: ed.sha1, reload: true });
+    if (!r.changed) alert("Nothing changed, so nothing was saved.");
+    closeEditor(true); load();
+  } catch (e) { $("edMsg").textContent = e.message; }
+  finally { $("edSave").disabled = !state.can_change; }
+}
+async function restoreEditor() {
+  const file = $("edRestore").value;
+  if (!file || !confirm("Replace the current config with this earlier version and reload the plugin?\nThe current config is backed up first.")) return;
+  try { await call("POST", `api/plugins/${ed.name}/config/restore`, { file }); closeEditor(true); load(); }
+  catch (e) { $("edMsg").textContent = e.message; }
+}
+
+function render() {
+  const { plugins, summary, progress, job } = state;
+  const q = $("search").value.trim().toLowerCase();
+  const busy = !!job.running, canChange = !!state.can_change;
+
+  const chips = $("chips"); chips.replaceChildren();
+  const add = (key, label, count) => {
+    const c = el("button", "chip", label); c.append(el("b", null, count));
+    c.setAttribute("aria-pressed", String(filter === key));
+    c.onclick = () => { filter = filter === key ? null : key; render(); };
+    chips.append(c);
+  };
+  add(null, "All", plugins.length);
+  ORDER.filter(k => summary[k]).forEach(k => add(k, LABELS[k], summary[k]));
+  if (state.broken) add("broken", "Fails to compile", state.broken);
+
+  const rows = $("rows"); rows.replaceChildren();
+  const shown = plugins
+    .filter(p => !filter || (filter === "broken" ? p.server_state === "failed" : p.status === filter))
+    .filter(p => !q || [p.name, p.title, p.author, p.description].some(v => (v || "").toLowerCase().includes(q)))
+    .sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status) || a.name.localeCompare(b.name));
+  for (const p of shown) {
+    const tr = el("tr");
+    const name = el("td");
+    const title = el("div", "name");
+    if (p.umod && p.umod.url) { const a = el("a", null, p.title || p.name); a.href = p.umod.url; a.target = "_blank"; a.rel = "noopener"; title.append(a); }
+    else title.textContent = p.title || p.name;
+    name.append(title, el("div", "sub", p.file + (p.author ? " · " + p.author : "")));
+    const desc = p.description || (p.umod && p.umod.description);
+    if (desc) name.append(el("div", "sub", desc));
+
+    const st = el("td"); const badge = el("span", "status s-" + p.status, LABELS[p.status] || p.status);
+    badge.title = p.error || HINTS[p.status] || ""; st.append(badge);
+    if (p.umod && p.umod.latest_release_at) st.append(el("div", "sub", "Released " + p.umod.latest_release_at.slice(0, 10)));
+
+    const sv = el("td"); const sb = el("span", "status s-" + p.server_state, SERVER[p.server_state] || p.server_state);
+    sb.title = HINTS[p.server_state] || ""; sv.append(sb);
+    if (p.server_state === "failed" && p.server_error) sv.append(el("div", "err", p.server_error));
+
+    const act = el("td"); const box = el("div", "actions"); act.append(box);
+    if (canChange && p.umod && p.status !== "up_to_date") {
+      const b = el("button", "primary small", p.status === "update_available" ? "Update" : "Reinstall from uMod");
+      b.disabled = busy;
+      b.onclick = () => confirm(`Replace ${p.file} (v${p.version || "?"}) with uMod's v${p.latest}?\nThe current file is backed up first.`) && post(`api/plugins/${p.name}/update`);
+      box.append(b);
+    }
+    if (canChange && p.backups) {
+      const b = el("button", "ghost small", "Roll back"); b.disabled = busy;
+      b.title = p.backups + " backup(s) kept";
+      b.onclick = () => confirm(`Restore the previous version of ${p.file}?`) && post(`api/plugins/${p.name}/rollback`);
+      box.append(b);
+    }
+    if (p.has_config) {
+      const b = el("button", "ghost small", "Config"); b.onclick = () => openEditor(p); box.append(b);
+    }
+    tr.append(name, el("td", "ver", p.version || "unknown"), el("td", "ver", p.latest || "—"), st, sv, act);
+    rows.append(tr);
+  }
+  if (!shown.length) { const tr = el("tr"); const td = el("td", "empty", plugins.length ? "No plugins match." : "No plugins found."); td.colSpan = 6; tr.append(td); rows.append(tr); }
+
+  const refresh = $("refresh");
+  refresh.disabled = !!progress.running;
+  refresh.textContent = progress.running ? `Checking ${progress.done}/${progress.total}…` : "Check for updates";
+  const all = $("updateAll"), n = summary.update_available || 0;
+  all.style.display = canChange && n ? "" : "none"; all.disabled = busy; all.textContent = `Update all (${n})`;
+  $("meta").textContent = progress.finished_at ? "Last checked " + new Date(progress.finished_at * 1000).toLocaleString() : "";
+
+  const notice = $("notice");
+  const msg = !state.oxide_dir_found ? "The Oxide plugins folder was not found. Check the container's /oxide mount."
+    : progress.error ? "Last check failed: " + progress.error
+    : !canChange ? "Read-only: updates are disabled until the container has a password and a writable Oxide folder." : "";
+  notice.textContent = msg; notice.style.display = msg ? "block" : "none";
+
+  const results = job.results || [];
+  $("activity").style.display = busy || results.length ? "block" : "none";
+  $("running").textContent = busy ? `${job.current}: ${job.step}…` + (job.remaining > 1 ? ` (${job.remaining - 1} more queued)` : "") : "";
+  const list = $("results"); list.replaceChildren();
+  for (const r of results) {
+    const li = el("li");
+    li.append(el("span", r.ok ? "ok" : "no", r.ok ? "OK " : "Failed "),
+      el("span", null, `${new Date(r.at * 1000).toLocaleTimeString()} · ${r.name}` + (r.from || r.to ? ` (${r.from || "?"} → ${r.to || "?"})` : "") + ` · ${r.message || ""}`));
+    list.append(li);
+  }
+}
+
+async function load() {
+  try {
+    const r = await fetch("api/plugins");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    state = await r.json(); render();
+  } catch (e) { $("notice").textContent = "Cannot reach the manager: " + e.message; $("notice").style.display = "block"; }
+  clearTimeout(timer);
+  const active = state.job && state.job.running || state.progress && state.progress.running;
+  timer = setTimeout(load, active ? 1500 : 30000);
+}
+$("refresh").onclick = () => post("api/refresh");
+$("updateAll").onclick = () => {
+  const n = state.summary.update_available || 0;
+  if (confirm(`Update ${n} plugin(s) from uMod, one at a time?\nEach is backed up first and restored automatically if the new version fails to compile.`)) post("api/update-all");
+};
+$("search").oninput = render;
+$("addOpen").onclick = () => { $("finder").showModal(); searchUmod(1); $("fdQuery").focus(); };
+$("fdClose").onclick = () => $("finder").close();
+$("fdGo").onclick = () => searchUmod(1);
+$("fdSort").onchange = () => searchUmod(1);
+$("fdQuery").onkeydown = (e) => { if (e.key === "Enter") searchUmod(1); };
+$("fdPrev").onclick = () => searchUmod(finder.page - 1);
+$("fdNext").onclick = () => searchUmod(finder.page + 1);
+$("tabForm").onclick = () => setMode("form");
+$("tabRaw").onclick = () => setMode("raw");
+$("edRaw").oninput = touch;
+$("edCancel").onclick = () => closeEditor(false);
+$("edSave").onclick = saveEditor;
+$("edRestoreBtn").onclick = restoreEditor;
+$("editor").addEventListener("cancel", (e) => { e.preventDefault(); closeEditor(false); });
+load();
+</script>
+</body>
+</html>

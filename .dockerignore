@@ -1,0 +1,9 @@
+.git
+tests
+docs
+data
+**/__pycache__
+.pytest_cache
+*.md
+password.txt
+.env
