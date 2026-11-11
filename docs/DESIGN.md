@@ -118,9 +118,23 @@ plugin.
 ## Security model
 
 See the [Security](../README.md#security) section of the README. In short: single shared
-password over HTTP Basic, a required custom header on every change to defeat cross-site
+password over HTTP Basic, a lockout after repeated wrong passwords, a required custom header on every change to defeat cross-site
 requests, strict plugin-name validation (`[A-Za-z0-9_]+`) before any path is built, and no
 secrets in logs or API responses. It is designed for a trusted LAN or VPN, not the open internet.
+
+### Login and lockout (`auth.py`)
+
+- The password lives in a file (`config.json`) rather than only in an environment variable so
+  the server's owner can change it, or recover from a forgotten one, by editing a file. The
+  file's modification time is checked on each request and it is re-read when it changes.
+- Wrong passwords are counted **per client IP**. A single global counter would let anyone on
+  the network lock the owner out; per-IP counting limits the damage to the guesser. Behind a
+  reverse proxy every visitor shares the proxy's address, so they share one counter.
+- A request with **no** password (a browser's first visit) is not counted; only a wrong one is.
+- While locked, the **correct password is refused too**. Otherwise a lockout would not slow
+  a guesser down at all.
+- Lockouts are written to `lockouts.json` so a container restart does not clear them, and so
+  that deleting the file is a simple manual override. Changing the password clears them too.
 
 ## Ideas not built yet
 

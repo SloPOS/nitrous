@@ -1,9 +1,9 @@
-.git
-tests
-docs
-data
 **/__pycache__
-.pytest_cache
-*.md
-password.txt
 .env
+.git
+.pytest_cache
+README.md
+data
+docs
+password.txt
+tests

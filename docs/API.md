@@ -4,12 +4,17 @@ The page is a thin client over this API, so anything the page does can be script
 
 ## Rules for every request
 
-- **Login.** When `MANAGER_PASSWORD` is set, every request needs HTTP Basic credentials: any
+- **Login.** When a password is set, every request needs HTTP Basic credentials: any
   username, and that password. Without them the answer is `401`.
+- **Lockout.** After `max_attempts` wrong passwords (5 by default) from one IP address, every
+  request from it gets `429` with a plain-text explanation and a `Retry-After` header, even
+  with the correct password, until the lockout ends or is cleared on the server.
+- **`GET /healthz`** needs no login and returns `{"ok": true}`. The container's health check
+  uses it.
 - **Changes need a header.** Every request that is not `GET` or `HEAD` must send
   `X-Nitrous: 1`, otherwise the answer is `403`. This stops other websites from triggering
   changes through a logged-in browser.
-- **Changes need write access.** They return `403` if `MANAGER_PASSWORD` is unset or the Oxide
+- **Changes need write access.** They return `403` if no password is set or the Oxide
   folder is read-only, and `409` while another change is running.
 - **Errors** are JSON: `{"detail": "what went wrong"}`.
 

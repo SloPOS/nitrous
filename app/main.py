@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import os
-import secrets
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,13 +14,14 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import configs, oxidelog, rcon, updater
+from .auth import Auth
 from .scanner import compare_versions, scan_plugins
 from .umod import UmodClient, new_http_client
 
 OXIDE_DIR = Path(os.environ.get("OXIDE_DIR", "/oxide"))
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 CHECK_HOURS = float(os.environ.get("CHECK_INTERVAL_HOURS", "6"))
-PASSWORD = os.environ.get("MANAGER_PASSWORD", "")
+auth = Auth(DATA_DIR, os.environ.get("MANAGER_PASSWORD", ""))
 STATIC = Path(__file__).parent / "static"
 
 umod = UmodClient(DATA_DIR / "umod_cache.json", ttl_seconds=CHECK_HOURS * 3600)
@@ -123,8 +123,8 @@ async def run_job(action: str, names: list[str], reason: str = "") -> None:
 
 
 def require_changes() -> None:
-    if not PASSWORD:
-        raise HTTPException(403, "Changes are disabled until MANAGER_PASSWORD is set on the container.")
+    if not auth.password_set:
+        raise HTTPException(403, "Changes are disabled until a password is set in config.json or MANAGER_PASSWORD.")
     if not updater.can_write(OXIDE_DIR):
         raise HTTPException(403, "The Oxide plugins folder is mounted read-only.")
     if job["running"]:
@@ -162,16 +162,27 @@ app = FastAPI(title="Nitrous", lifespan=lifespan)
 
 @app.middleware("http")
 async def guard(request: Request, call_next):
-    if PASSWORD:
-        supplied = ""
-        header = request.headers.get("authorization", "")
-        if header.lower().startswith("basic "):
-            try:
-                supplied = base64.b64decode(header[6:]).decode("utf-8", "replace").partition(":")[2]
-            except ValueError:
-                supplied = ""
-        if not secrets.compare_digest(supplied.encode(), PASSWORD.encode()):
-            return Response("Password required.", 401, {"WWW-Authenticate": 'Basic realm="Nitrous"'})
+    if request.url.path == "/healthz":  # container health check; reveals nothing
+        return JSONResponse({"ok": True})
+    supplied = None
+    header = request.headers.get("authorization", "")
+    if header.lower().startswith("basic "):
+        try:
+            supplied = base64.b64decode(header[6:]).decode("utf-8", "replace").partition(":")[2]
+        except ValueError:
+            supplied = ""
+    client = request.client.host if request.client else "unknown"
+    result, locked_for = auth.check(client, supplied)
+    if result == "locked":
+        wait = "until it is unlocked on the server" if locked_for == float("inf") else \
+            f"in {max(1, round(locked_for / 60))} minute(s)"
+        headers = {} if locked_for == float("inf") else {"Retry-After": str(int(locked_for) + 1)}
+        return Response(
+            f"Too many wrong passwords. Sign-in from this device is locked; try again {wait}.\n"
+            "To unlock now, change the password in config.json in Nitrous's data folder on the "
+            "server, or delete lockouts.json there.", 429, headers, media_type="text/plain")
+    if result in ("missing", "bad"):
+        return Response("Password required.", 401, {"WWW-Authenticate": 'Basic realm="Nitrous"'})
     # Changes must come from this page's own script, not a form on another site.
     if request.method not in ("GET", "HEAD") and request.headers.get("x-nitrous") != "1":
         return JSONResponse({"detail": "Missing X-Nitrous header."}, 403)
@@ -191,7 +202,7 @@ def api_plugins():
         "progress": progress,
         "job": job,
         "oxide_dir_found": (OXIDE_DIR / "plugins").is_dir(),
-        "can_change": bool(PASSWORD) and updater.can_write(OXIDE_DIR),
+        "can_change": auth.password_set and updater.can_write(OXIDE_DIR),
         "rcon": rcon.configured(),
     }
 
