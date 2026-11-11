@@ -28,6 +28,7 @@ Nitrous is not affiliated with uMod, Oxide or Facepunch.
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
 - [Project layout](#project-layout)
+- [License](#license)
 
 Further reading: [HTTP API](docs/API.md) · [Design notes](docs/DESIGN.md)
 
@@ -276,3 +277,10 @@ OXIDE_DIR=/path/to/oxide-copy DATA_DIR=/tmp/nitrous-data MANAGER_PASSWORD=dev \
 | `tests/` | Unit tests |
 | `deploy.sh` | Build and run beside a Rust server container |
 | `docs/` | API reference and design notes |
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) for the
+copyright notice.
+
+Plugins that Nitrous downloads from uMod are separate works under their own licenses.
